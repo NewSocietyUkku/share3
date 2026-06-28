@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanical Unicode Watch - List Controller</title>
+    <style>
+        body, html {
+            background-color: #121212;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; 
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        /* Watch Screen Styles */
+        #watchScreen {
+            display: flex; 
+            width: 100vw;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+            background-color: #070a0f; 
+            position: relative;
+            transition: background-color 0.4s ease; 
+        }
+
+        /* Watch Case & Dial */
+        .watch-case {
+            width: 400px; 
+            height: 440px;
+            background: #121824; 
+            border-radius: 80px; 
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.05), 0 30px 60px rgba(0,0,0,0.8);
+            position: relative;
+            border: 8px solid #2b394e; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            transition: background 0.4s ease, border-color 0.4s ease; 
+        }
+
+        .dial {
+            width: 90%;
+            height: 88%;
+            position: relative;
+            pointer-events: none;
+        }
+
+        /* Complications */
+        .comp {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .circle {
+            width: 28px; 
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #333; 
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: background-color 0.2s;
+        }
+
+        /* Positions */
+        .tl { top: 18%; left: 10%; }
+        .tr { top: 18%; right: 10%; }
+        .br { bottom: 22%; right: 10%; }
+        
+        /* Bottom Left (Stacked) */
+        .bl { 
+            bottom: 20%; 
+            left: 10%; 
+            flex-direction: column; 
+            gap: 5px;
+        }
+        .bl-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        /* Analog Hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            background: #fff;
+            border-radius: 4px;
+            z-index: 10;
+        }
+
+        .hour-hand { width: 8px; height: 80px; margin-left: -4px; background: #e0e0e0; }
+        .minute-hand { width: 6px; height: 120px; margin-left: -3px; background: #ffffff; }
+        .second-hand { width: 2px; height: 135px; margin-left: -1px; background: #ff3b30; z-index: 11; }
+
+        /* Red Center Dot */
+        .center-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 48px;
+            height: 48px;
+            background: #ff3b30;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 14;
+            border: 4px solid #1e1e1e;
+            cursor: pointer;
+            pointer-events: auto !important;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .center-dot:hover {
+            transform: translate(-50%, -50%) scale(1.15);
+            background-color: #ff5c53;
+        }
+
+        .center-dot:active {
+            transform: translate(-50%, -50%) scale(0.9);
+            background-color: #cc2a22;
+        }
+
+        /* Simple dial markers */
+        .marker {
+            position: absolute;
+            width: 3px;
+            height: 15px;
+            background: #555;
+            left: 50%;
+            margin-left: -1.5px;
+            transform-origin: 50% 180px;
+            top: 10px;
+        }
+
+        /* Peek Button */
+        #modePeekBtn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #2b394e;
+            border: 6px solid #5a739c;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%; 
+            cursor: pointer;
+            z-index: 20;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        #modePeekBtn:hover {
+            background-color: #3b4e6a;
+        }
+
+        #modePeekBtn:active {
+            transform: translateY(-50%) scale(0.90);
+        }
+
+        /* Peek Text Overlay */
+        #textOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(7, 10, 15, 0.95);
+            border: 2px solid #5a739c;
+            padding: 30px 40px;
+            border-radius: 12px;
+            z-index: 50;
+            display: none; 
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+            pointer-events: none; 
+            font-family: monospace;
+            min-width: 150px;
+        }
+
+        .peek-context-row {
+            color: #888;
+            font-size: 22px;
+            letter-spacing: 4px;
+            min-height: 26px;
+        }
+
+        .peek-current-row {
+            color: #ff3b30;
+            font-size: 48px;
+            font-weight: bold;
+            border-top: 2px solid #333;
+            border-bottom: 2px solid #333;
+            padding: 10px 0;
+            width: 100%;
+            text-align: center;
+            min-height: 55px;
+        }
+
+        .mode-indicator {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #5a739c;
+            font-weight: bold;
+            font-size: 24px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="watchScreen">
+        <div id="modeIndicator" class="mode-indicator">Mode 1: Advance by 1</div>
+        <button id="modePeekBtn" onclick="triggerPeekText(event)" title="Peek Context"></button>
+        <div id="textOverlay"></div>
+
+        <div class="watch-case" id="watchCase">
+            <div class="dial">
+                <div class="marker" style="transform: rotate(0deg);"></div>
+                <div class="marker" style="transform: rotate(30deg);"></div>
+                <div class="marker" style="transform: rotate(60deg);"></div>
+                <div class="marker" style="transform: rotate(90deg);"></div>
+                <div class="marker" style="transform: rotate(120deg);"></div>
+                <div class="marker" style="transform: rotate(150deg);"></div>
+                <div class="marker" style="transform: rotate(180deg);"></div>
+                <div class="marker" style="transform: rotate(210deg);"></div>
+                <div class="marker" style="transform: rotate(240deg);"></div>
+                <div class="marker" style="transform: rotate(270deg);"></div>
+                <div class="marker" style="transform: rotate(300deg);"></div>
+                <div class="marker" style="transform: rotate(330deg);"></div>
+
+                <div class="comp tl">
+                    <div class="circle" id="circ-tl1"></div>
+                    <div class="circle" id="circ-tl2"></div>
+                    <div class="circle" id="circ-tl3"></div>
+                </div>
+
+                <div class="comp tr">
+                    <div class="circle" id="circ-tr1"></div>
+                    <div class="circle" id="circ-tr2"></div>
+                    <div class="circle" id="circ-tr3"></div>
+                </div>
+
+                <div class="comp br">
+                    <div class="circle" id="circ-br1"></div>
+                    <div class="circle" id="circ-br2"></div>
+                    <div class="circle" id="circ-br3"></div>
+                </div>
+
+                <div class="comp bl">
+                    <div class="bl-row">
+                        <div class="circle" id="circ-bl-list0" title="List Number Hundred">-</div>
+                        <div class="circle" id="circ-bl-list1" title="List Number Ten">-</div>
+                        <div class="circle" id="circ-bl-list2" title="List Number Unit">-</div>
+                    </div>
+                    <div class="bl-row">
+                        <div class="circle" id="circ-bl0" title="Character Number Hundred">-</div>
+                        <div class="circle" id="circ-bl1" title="Character Number Ten">-</div>
+                        <div class="circle" id="circ-bl2" title="Character Number Unit">-</div>
+                    </div>
+                </div>
+
+                <div class="hand hour-hand" id="hourHand" style="transform: rotate(305deg);"></div>
+                <div class="hand minute-hand" id="minuteHand" style="transform: rotate(60deg);"></div>
+                <div class="hand second-hand" id="secondHand" style="transform: rotate(0deg);"></div>
+                
+                <div id="randomNumber" style="
+                    position: absolute;
+                    top: calc(50% - 52px);
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-family: monospace;
+                    font-size: 22px;
+                    font-weight: bold;
+                    color: #ff3b30;
+                    letter-spacing: 4px;
+                    z-index: 15;
+                    pointer-events: none;
+                    transition: opacity 1s ease;
+                    text-shadow: 0 0 8px rgba(255,59,48,0.6);
+                ">000</div>
+
+                <div class="center-dot" onclick="toggleFullScreen()" title="Toggle Full Screen"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== DATA ==========
+        // Original sparse list of entries
+        const originalEntries = [
+            "101 psi",
+            "102 sucubese A sex demone that has sex with you",
+            "103 zoroastrianism",
+            "104 Saturn planet in our solar system",
+            "105 seff",
+            "106 zuman the alien specials that are green looking with tenticals on head/atteners",
+            "107 signal like a signal from good",
+            "108 soul",
+            "109 isibot An machine that was worshiped as agod by Zulus",
+            "110 dosage reated to drug use, spiratu",
+            "111 dying near death experiences",
+            "112 Dakas/Dakini - Buddhist enlightened female spirits or messengers, often associated with tantric practices (starts with \"dak\").",
+            "113 dragon",
+            "114 Dipankara Is one of the budders of the past",
+            "115 Davas alternitive pronunciation od Daevan Daevas Armenian demonis forgetting gods of persia zooharaism demones",
+            "116 dome like the sofia dome in Turkey",
+            "117 di-ya-tee (like a worshiped object or god)",
+            "118 delta futuristic video game Halo group",
+            "119 i-boo a vertual ghost that haunts you via your phone",
+            "120 cousin claudio a hippy who lives in off the grid on a farm",
+            "121 Ki DBZ spiritual character",
+            "122 xe-xe South African black magic",
+            "123 crow an animal assosiated with spirits",
+            "124 ca-twitch a black cat foe witches",
+            "125 Kether The crown and hoghest point of the Kabballah tree on body comferter",
+            "127 co-yo-ti a god that is agiant kayodi",
+            "128 killun the god of killing",
+            "129 caben (like a caben in the woods used for spiritual hirriw movies rituals)",
+            "130 whisler a spirtual music maker",
+            "131 wide eyes a spiritual awakening",
+            "132 wicker a spiruatal religion",
+            "133 eurainase a planet",
+            "134 water like holy water",
+            "135 ri-fi a spiritual wifi",
+            "136 whener a time travelling device",
+            "137 regainer reconnecting to your spirtu self",
+            "138 realanity a type of religion that tries to join science and spiritualality",
+            "139 richism religion that sulports rich people",
+            "140 testiment like the new and old testiment",
+            "141 padoras box another spelling of pandoras box",
+            "142 teck-strucracy a futuristic dystopia where tecnology rules society amd the rulling alietd",
+            "143 Prometheus greek titan who gave fire to humanity",
+            "144 tea-tan a sopisticated titan worrier of greek myology",
+            "145 puff adder creater of horrow (serpent)",
+            "146 temple",
+            "147 peegan A peasant pagan",
+            "148 atlantas",
+            "149 patch pirate patch of a ghost pirate",
+            "150 Viserys Targaryen white haired game of thrones guy",
+            "151 Vider dark Vaders brother",
+            "152 Victer Van Doom green futuristic Robinhood like character",
+            "153 frodo baggins the main character of lord of the rings",
+            "154 Vatala (Roman) - Goddess of agriculture and the countryside",
+            "155 Faith",
+            "156 fantum",
+            "157 Vagitanus (Roman) - God who presided over a child's first cry",
+            "158 Thalassa Neptunes moon",
+            "159 Phobia",
+            "160 mass like a church gathering",
+            "161 Nightmares related to spiritualy and horrow",
+            "162 max-tric a horror show version of the matrics",
+            "163 mars",
+            "164 Jupiter",
+            "165 the jebson another name for the jetsoms futuristic cartoon",
+            "166 Janist",
+            "167 naga indian god creature",
+            "168 Jilly monster I type of Jelly alien",
+            "169 Mechael Arch angel from bible",
+            "170 gospil",
+            "171 god",
+            "172 goyku dbz character",
+            "173 gears of war",
+            "174 Get Out a horror movie about ghost and amd demonic posiion",
+            "175 Gefjon the norse god of fertility",
+            "176 ganesha (india god with elephant head)",
+            "177 goggle device scifi device used to see other wods",
+            "178 Glycon greek snake god",
+            "179 goblin",
+            "180 Hesperides Greek nymph goddesses of evening and golden apples.",
+            "181 Hedonism",
+            "182 Hercules - Greek strong god that they made a Disney program of",
+            "183 Hecate - Greek goddess of witchcraft, crossroads, and the night.",
+            "184 hopi religion indigiones beliefs of the hopi people",
+            "185 heaven",
+            "186 alien",
+            "187 hagstone A stone with a natural hole, used in some pagan or folk religious practices as a protective charm.",
+            "188 hell",
+            "189 hich hikers guide",
+            "190 District 9",
+            "191 budism",
+            "192 back to the future",
+            "193 Borg strek beam that loves kn space",
+            "194 choppie",
+            "195 Chandra Hindu god of the moon, associated with beauty and serenity.",
+            "196 Chono Trigger Alternative of chrono Trigger japanese role playing video game redhead guy who looks.kinda like goyku",
+            "197 bugs of starship troopwers",
+            "198 black hole",
+            "199 bio-charge a super cosmic energy",
+            "201 Sediment",
+            "202 sky",
+            "203 swim",
+            "204 steam",
+            "205 sifermal a water device tgat stores and captures heat. A water bottle",
+            "206 smoke",
+            "207 sigma water a greek water sign",
+            "208 soldering",
+            "209 Submarin",
+            "210 diesel",
+            "211 diver",
+            "212 docet where they store ships",
+            "213 dry",
+            "214 dip",
+            "215 defuse defusing a bomb",
+            "216 damp",
+            "217 dog salmon river rivier in Alaska",
+            "218 dolores river in colorado",
+            "219 dubawnt lake Canada",
+            "220 Coast",
+            "221 cody falls North Carolina",
+            "222 Coke A liquid",
+            "223 cramation",
+            "224 explosion",
+            "225 cough",
+            "226 candle",
+            "227 oxygen",
+            "228 cloud",
+            "229 ka-boom the sound of an explosion",
+            "230 wis water that taste like wee",
+            "231 white river usa",
+            "232 wreck like a ship wreck",
+            "233 rain",
+            "234 wet",
+            "235 earth has lost of water",
+            "236 wind",
+            "237 rio grande River im Mexico and USA",
+            "238 welding",
+            "239 ruble what's left after a place has been burtned down or destroyed",
+            "240 puss, a liquid that leaves the body",
+            "241 pirate",
+            "242 picric acid tnp (t a type of explosive",
+            "243 tornado",
+            "244 petrol",
+            "245 tovex a commorcial explosive",
+            "246 tank (fish tank)",
+            "247 tugboat",
+            "248 plain",
+            "249 tabaco",
+            "250 fuse used to set off bombs Aa5",
+            "251 Violet light",
+            "252 vacuum no air ?",
+            "253 vortex",
+            "254 vape",
+            "255 fade mararge what happens when you get heat and see illotions fade into the distance",
+            "256 fan used to blow wind",
+            "257 figit a euthism for a fucking explosive",
+            "258 flight",
+            "259 Vitcher when the winds so strong that it makes broom sticks fly",
+            "260 Mississippi river the seocond largest river in the usa",
+            "261 microwabe",
+            "262 nuclear explosion",
+            "263 Marina A place where they keep sealife",
+            "264 Map Used to explore the seas",
+            "265 navigator for flights amd sea",
+            "266 monsoon",
+            "267 negative buoyancy when something doesn't float on water",
+            "268 melt",
+            "269 nebraska river",
+            "270 gush like a gush of wind",
+            "271 giddy having a sensation of whirling and a tendency to fall or stagger; dizzy.",
+            "272 gokire a flame caused by a supersaying like goku",
+            "273 ground",
+            "274 guttet, used for traping watet houses",
+            "275 go-free cheap flying companies like Ryanair",
+            "276 gaps like gaps in the earths crust",
+            "277 gaytal floods floods strong enough to open the flood gaita",
+            "278 i-glue another word for iglue ice hut",
+            "279 yacht a type of small boat",
+            "280 hash-tag global warming related to water and fire",
+            "281 lightning",
+            "282 hecture measure of land",
+            "283 Hurricane",
+            "284 heat",
+            "285 lava",
+            "286 humidity",
+            "287 lagoon",
+            "288 Hail",
+            "289 hob a device used for cooking",
+            "290 beast amythical creature in religion",
+            "291 chide like wind chide that make noises when the wind blows",
+            "292 choker a person who takes away another persons air",
+            "293 burned",
+            "294 boat",
+            "295 above the skys above",
+            "296 bonfire",
+            "297 boy-yet a boy in water but specifically used for saving lives",
+            "298 blue skies",
+            "299 beach",
+            "301 Ciudad del Este A commercial hub near the Brazilian border In Paraguay",
+            "302 Sucre Ciudad en Bolivia",
+            "303 swift current City in canada",
+            "304 Aztek",
+            "305 Safford Anson P.K. Safford, Arizona’s territorial governor back in the 1870s .",
+            "306 Simone Bolivia",
+            "307 Sag Harbor A village in New York",
+            "308 Selena Gomez",
+            "309 Sabinal Town in Texas",
+            "310 Des Moines Iowa, USA. Starts with D, followed by E (vowel), then S.",
+            "311 Didsbury City in Alberta Canada",
+            "312 Dakota north or South Dakota",
+            "313 Duran city in Educado",
+            "314 Dot Dot com crash",
+            "315 Divinopolis minipic in Brazil",
+            "316 Denver (the capital colarado)",
+            "317 Digby Town in Nova Scotoa",
+            "318 Adele",
+            "319 Dabney Kentucky",
+            "320 Costa Rica",
+            "321 cody town in wyoming",
+            "322 cuoco kaley cuoco",
+            "323 Christerper Colombia",
+            "324 Kit Carson traper that carson city is names aftet",
+            "325 cafferteria like the us movies",
+            "326 Cananda",
+            "327 Caguas city, Puerto Rico",
+            "328 Colombus university",
+            "329 Cuba",
+            "330 Arizona",
+            "331 Wyoming",
+            "332 Rockford, Illinois (city) (second biggist city in Illinios, only being beated by Chiacargo)",
+            "333 Oruro ciudad em Bolovia",
+            "334 rap music",
+            "335 Rio Vista Small City in California",
+            "336 Argentina",
+            "337 Uruguay",
+            "338 Rolling Stones the rolling stones",
+            "339 Rio Branco the capital city of the Brazilian state of Acre",
+            "340 poster someone from the US who is always posting what they do",
+            "341 Pie American Bye bye miss American Pie",
+            "342 Texas",
+            "343 Peru",
+            "344 Deptford New Jersey, USA",
+            "345 tove lo usa swedish simger",
+            "346 Panama",
+            "347 tagline us advertising",
+            "348 Phill dogtor phi",
+            "349 Apache Us tribe",
+            "350 Fishing is movies",
+            "351 Fight club",
+            "352 Fuckers Porn studios USA",
+            "353 Virgina like East and West Virgina",
+            "354 Fatties usa with fat people",
+            "355 Foo Fighters",
+            "356 Fun Q house song by Pink or a massive party",
+            "357 fayette city City in Alabama",
+            "358 Florida",
+            "359 fab key for opening doors inverted innthebusa",
+            "360 Amazon the Amazom",
+            "361 Miyan",
+            "362 Inca",
+            "363 Jordan Peterson",
+            "364 United States",
+            "365 manifised destiny",
+            "366 Jamaica",
+            "367 New York",
+            "368 Jelly like Jelly and toast",
+            "369 Nebraska",
+            "370 ghost busters us movie",
+            "371 Guynacolergist has more docoters in thebusa than anywhere else",
+            "372 Geek Found in Silicon vally",
+            "373 Greeenland",
+            "374 Guatemala",
+            "375 Giver I dont know if I'm a giver song",
+            "376 Young Turks the young Turks network",
+            "378 Eagles Like the Eagles",
+            "379 Guayaquil Major city in Ecudor",
+            "380 Alaska",
+            "381 el dorado",
+            "382 Alex Jones",
+            "383 Lorain, Ohio USA",
+            "384 La Paz ciudad Bolívar",
+            "385 Elvis Presly",
+            "386 Henry Ford",
+            "387 La Guaira Major city usa",
+            "388 Hulk",
+            "389 Alabama",
+            "390 chesapeake Town in Virginia",
+            "391 binary gender studies of binery vs non binery",
+            "392 Chicago",
+            "393 Brazil",
+            "394 Chattanooga",
+            "395 chief indian chief",
+            "396 Ben Shapiro",
+            "397 Beyonce",
+            "398 Bolivia",
+            "399 bob Dylan blowing in the wind",
+            "401 sudan",
+            "402 Saka Zulu",
+            "403 Sierra Leon",
+            "404 soap hippies selling soap in south africa",
+            "405 safari",
+            "406 Zimbabwe",
+            "407 segregation",
+            "408 slavery",
+            "409 Subia Bantu people in Namibia, Zambia, and Botswana, riverine farmers along the Zambezi.",
+            "410 disease",
+            "411 Die really violent and many people die",
+            "412 Dakar A major city im Senegal",
+            "413 Durban",
+            "414 Detail Autistic trait",
+            "415 death man diseases and so man people go death",
+            "416 dum many blam africans are dumb",
+            "417 doggy puppy imagionary flying puppy dogs you made up wheb you were a kid",
+            "418 Dillian someone you new in South Africa",
+            "419 Dutchman Afrikaaner",
+            "420 xhosa (cusa)",
+            "421 kidish your had you childhood in SA",
+            "422 Cape Town",
+            "423 caruption",
+            "424 cutting power eskom",
+            "425 Caffer cad word for a black person",
+            "426 cameroon",
+            "427 kigali capital of Rwanda",
+            "428 Colinisation",
+            "429 Kabwe Zambian lead poisened city",
+            "430 westerm Sahara",
+            "431 radford",
+            "432 erectile desfunction A dreas erectile desfimction",
+            "433 war",
+            "434 RO tumbo",
+            "435 Rough Like the people of South Africa",
+            "436 Randpark Ridge",
+            "437 regression South Africa going backwards and not progressing",
+            "438 walls Jorbug with all its big walls",
+            "439 rabbits the rabbits band",
+            "440 Ties Ties made in shoe laces, you learnet to tie your shoe laces in South Africa",
+            "441 Tiezer alternative way to say Taiser, Andrea chased you with this",
+            "442 tuck-shop",
+            "443 apartheid",
+            "444 pup food you eat thats lime polenta",
+            "445 poverty",
+            "446 township",
+            "447 tiger brands",
+            "448 Palm oil",
+            "449 teachers all your school teachers were south Africa",
+            "450 visser (afrikaaners, eddies surname)",
+            "451 fines like speeding ticlets",
+            "452 fixer you fixed everything in SA",
+            "453 Afrikaans",
+            "454 Fet-cook",
+            "455 fifa socoer world cup",
+            "456 Venda",
+            "457 figs you ate them in SA lab rat centr",
+            "458 flask Soap flask",
+            "459 Fetch something you did with your dogs in SA",
+            "460 Mess you were always messy in South Africa",
+            "461 Nigeria",
+            "462 Nikita Girl at Knights college",
+            "463 Moroco",
+            "464 mita k short for mister Mista K",
+            "465 Natasha your cousing",
+            "466 Maids found cheap in SA",
+            "467 Mugged Being robbed in South Africa",
+            "468 Nelson Mandela",
+            "469 Joburg",
+            "470 Gisenyi a city in Rwanda",
+            "471 gode this is an airport in Ethiopia",
+            "472 Yakubu Gowon",
+            "473 Gardeners Found cheap in SA",
+            "474 Gauteng",
+            "475 Giovanni your cousin",
+            "476 Uganda",
+            "477 Game ride",
+            "478 gold fish",
+            "479 Gaberone Major city in Botswana",
+            "480 Lesoto",
+            "481 Lion hunter",
+            "482 Lexicon You learned this in SA thT people speak differently",
+            "483 Laura South African you new ad Radford",
+            "484 lips black africkaans have bog lips",
+            "485 leaflet what blacls hand out at robots for people to take",
+            "486 hunting",
+            "488 helpers blacl helpers are super cheap im South Africa",
+            "489 leaches found in nonos dam",
+            "490 bus taxis only found in South Africa",
+            "491 Chad",
+            "492 Chaca laca",
+            "493 beer drinking castle beer with a bbq",
+            "494 beeping traffic jams",
+            "495 Bafoussam city in Cameroon",
+            "496 Bino",
+            "497 Beggers",
+            "498 blacks",
+            "499 BBQ",
+            "501 Cyprus",
+            "502 scandernvian",
+            "503 Sweden",
+            "504 statues",
+            "505 Seven Deven 711 in deven (Deven people met in tokyo)",
+            "506 Zenmark Budhist denmark",
+            "507 soggy winters English weather",
+            "508 sligo",
+            "509 Deutschland",
+            "510 Desenzano del Garda",
+            "511 Dadona ancient city greece",
+            "512 Diksmuide A city in Flanders, Belgium",
+            "513 Ireland",
+            "514 Items Trade europe",
+            "515 defending castles like structures",
+            "516 danube river",
+            "517 Deggendorf city in Germany",
+            "518 Dua Lipa Britiah Albaniam artist",
+            "519 Dublin",
+            "520 castle",
+            "521 Cadiz city in Spain",
+            "522 cock names mamy names in England use cock",
+            "523 Ukrian",
+            "524 Katowice city in Poland capital of Silesian Voivodeship Poland",
+            "525 Cefalù a city in sicily",
+            "526 Canal",
+            "527 cagliari Cagliari is the capital city of the Italian island of Sardinia",
+            "528 Celle city in Germany",
+            "529 coburg a town in Bavaria, Germany",
+            "530 Russia",
+            "531 Wine",
+            "532 Wexford",
+            "533 warsaw capital of Poland",
+            "534 rita ora UK alabanian singer",
+            "535 Rafael Nadel Spanish Tennis Player",
+            "536 Rome",
+            "537 Riga the capital of latvia",
+            "538 Royal Tunbridge Wells",
+            "539 Rachel Weisz UK actress and actress of the Mummy",
+            "540 Pisa tower the tower of Pisa Italy",
+            "541 Paderborn city in Germany",
+            "542 Pecs 5th largest city in hungry",
+            "543 paris",
+            "544 Tipperary (county of Ireland)",
+            "545 Pavel Vinogradov Rusias oldest astronaut",
+            "546 Timișoara, romania",
+            "547 Pego town in Spain",
+            "548 plato",
+            "549 Pabianice City in Poland",
+            "550 viseu district of Portugal",
+            "551 Viking",
+            "552 Fucking town town in Austria",
+            "553 France",
+            "554 fatmilia Italiano/mederterainian",
+            "555 vivo spanish word for life, meaning lively",
+            "556 Athens",
+            "557 Vigo",
+            "558 village European small village",
+            "559 Vichy French city with a cosmetic company named after it",
+            "560 Macidonia",
+            "561 Nudity",
+            "562 Micael Angelo",
+            "563 Norway",
+            "564 Gypies",
+            "565 meath county in Ireland",
+            "566 Manchester",
+            "567 England",
+            "568 Milan",
+            "569 maubeuge city in france near luxemburg",
+            "570 Guese Queen the Queen if England owns all the Quue",
+            "571 Guadalajara Province of Spain",
+            "572 Giacomo Casanova Italian Opera composer",
+            "573 Greece",
+            "574 Gepetto character in Pinocchio",
+            "575 Government Goverments starting in Europe",
+            "576 Gent city in Belgium",
+            "577 Yegor Gaidar Russian politician and econermist",
+            "578 galway",
+            "579 guchi a european clothing brand",
+            "580 Lasker Emanuel Lasker, German chess player and mathematician",
+            "581 Aldi",
+            "582 Alexander the Great",
+            "583 Herodotus",
+            "584 Hitler",
+            "585 Louth county Ireland",
+            "586 London",
+            "588 Lil-del Lidle ternitive pronpinciatiom",
+            "589 Albainier",
+            "590 booster the first covid boosters/vacines were in Europa",
+            "591 budapest capital of hungry",
+            "592 Checm Republic",
+            "593 Berlin",
+            "594 Bitonto war of polish succession battle and town name italy",
+            "595 Baveria",
+            "597 Beja Region in Portugal",
+            "598 Ball room dancing",
+            "599 Bucha City in Ukraine where 2022 invasion of Ukraine butch happened",
+            "601 Suadi Arabia",
+            "602 Uzekistan Uzbekistan diff name",
+            "603 Azerbaijan",
+            "604 Astana Capital of Kazakhstan",
+            "605 sufist a specific group of people in the Islamic world",
+            "606 Senpai",
+            "607 sagada city in the Philippines",
+            "608 Silk road",
+            "609 Sublimimal Sub marketing china",
+            "610 Dasa sila Ten Precepts) are a foundational code of ethics in Buddhism, particularl part of the ten precept of budhism",
+            "611 dadu The old Mongolian capital 1264. Served as capital until the fall of the monglns. Became what is Beijing now",
+            "612 Dhaka Capital of Bangalash",
+            "613 dharma cosmic law of buudism, hindueism etc",
+            "614 datong city in China (the city of coal)",
+            "615 The Dafo Temple Guangzhou, Guangdong, China.",
+            "616 Adona Turkish city close to Syria",
+            "617 deiyety worship both in the middle east and other paets of asia",
+            "618 dalai lama",
+            "619 dubai city",
+            "620 Kazakhstan",
+            "621 kaddish Jewish mourning pray",
+            "622 kakariko fictional village in Japanese company, the legend of Zelda",
+            "623 Korea",
+            "624 Qotar",
+            "625 covid spread from asia China",
+            "626 Kung-fu",
+            "627 kagu (also means furniture in japanese) the kami of kagutsuchi fire in shintuism",
+            "628 colombo city in sir Lanka",
+            "629 Kubal capital of Afghanistan",
+            "630 Ras Al Khaimah (United Arab Emirates) - A major emirate city in the UAE, known for coastal life",
+            "631 Rice",
+            "632 Iraq",
+            "633 ararts Short for martial arts martial arts",
+            "634 Raipur (India, Chhattisgarh)",
+            "635 Reefing ocianic ireland activity",
+            "636 Iran",
+            "637 Rayong city in Thailand south East of bangkok",
+            "638 Wuhan the city where covid came from City China",
+            "639 Rạch Giá Vietnam",
+            "640 Tajikistan",
+            "641 Thailand",
+            "642 otaku someone obessed with anime",
+            "643 Traders",
+            "644 Papa new Genie",
+            "645 Tuvalu",
+            "646 tombs found excessively in asia",
+            "647 toga an alternitive spelling ofthe ireland nation of tonga",
+            "648 philopeans",
+            "649 Peaches Mario character from Japanese Francise",
+            "650 facial surgery korea",
+            "651 Fights martial arts",
+            "652 fixationers Westers obseessed with Chinese, Korean or Japanese culture",
+            "653 fergana valley, Uzbekistan",
+            "654 Fatehpur city in India",
+            "655 vavuniya city in Sir Lanka",
+            "656 Fiji",
+            "657 Afganistán",
+            "658 Villian like the russian movies soviet union asia",
+            "659 Fuchow alternitive spelling of Fuzhou",
+            "660 moseard a moses beard",
+            "661 noodles",
+            "662 Micronesia",
+            "663 Jordan",
+            "664 Japan",
+            "665 nose job korea",
+            "666 Mongolia",
+            "667 miyazaki Animator japan",
+            "668 mahamed Islamic profet",
+            "669 macheng city china",
+            "670 Yashiro nene Yashiro",
+            "671 Gide asian tourism",
+            "672 Yekat 4th largest city in Russia",
+            "673 grotto budist grottos",
+            "674 gapan city in the Philippines",
+            "675 gifu city in Japan",
+            "676 Gun powder was discovered in Asia",
+            "677 yoga",
+            "678 gilgit pakistan city and Capital of region in Pakistan",
+            "679 Gobichettipalayam town in India",
+            "680 Loas",
+            "681 Hyderabad city in India",
+            "682 Lac city in Vietnam",
+            "683 Harbon city in China",
+            "684 hoty asian prostitute",
+            "685 heavy a fat budhe",
+            "686 Hong Kong",
+            "688 oil-ly middle east has alot of oil",
+            "689 Liaoyang City in Chima",
+            "690 choosing the wise one lilentheast air bender, the chosen one",
+            "691 China",
+            "692 Chak chaK traditional fried chinese dough",
+            "693 Burma",
+            "694 Baotou city China",
+            "695 Chufav Thai herbal tea",
+            "696 ninja",
+            "697 Choibalsan 5th largest City in Mongolia",
+            "698 bulls worshiped in the middle east",
+            "699 Bey of Bengal",
+            "701 Science",
+            "702 soccer",
+            "703 surfing",
+            "704 e-sport",
+            "705 Sofia Kovalevskaya Russian mathematican",
+            "706 snobaording",
+            "707 Segisaurus - A small theropod dinosaur",
+            "708 sailing",
+            "709 Suborder - A taxonomic rank in scientific animal classification",
+            "710 Isaac Newton famous scientist",
+            "711 Dinosaurs",
+            "712 dextors labority",
+            "713 darts",
+            "714 data",
+            "715 david recardo",
+            "716 Dodge ball",
+            "717 Diego Golombek Argentinian Biologist",
+            "718 I hocky (short for ice hockey) Ice Hokey",
+            "719 Dubreuillosaurus A megalosaurid theropod dinosaur",
+            "720 exsperaments",
+            "721 kite the story of the kite that got hit by lightning (Newton)",
+            "722 accounting",
+            "723 criminology",
+            "724 Copper Used for many scientic experiments",
+            "725 Kiphylla (a nickname of Diphylla)",
+            "726 economics",
+            "727 cog turns machines",
+            "728 class like a class of students",
+            "729 Caber Toss Scotish sport of carring large logs",
+            "730 roasting like comerdy central a sport ot making fun of people",
+            "731 Radius A long bone in the forearm",
+            "732 Arculogogy The study of old civilisations",
+            "733 Rewilding Bringing back nature",
+            "734 water polo",
+            "735 rivus lacrimalis a small tear",
+            "736 running",
+            "737 rugby",
+            "738 wealth if nations",
+            "739 archery",
+            "740 test",
+            "741 Pi maths symbol",
+            "742 Toxicology Toxicology is a scientific discipline",
+            "743 trophy",
+            "744 topology",
+            "745 teflon banned toxic material for pots",
+            "746 Tennis",
+            "747 tug of war",
+            "748 polo",
+            "749 tibula",
+            "750 fisics",
+            "751 Finance",
+            "752 ethics",
+            "753 Formular one",
+            "754 football American football",
+            "755 fovea ovalis Part of heart",
+            "756 femur bone in the human body",
+            "757 figure skating",
+            "758 Volley ball",
+            "759 fibula",
+            "760 noise the human noise",
+            "761 Judo",
+            "762 Nikola Tesla",
+            "763 growth domist products",
+            "764 Netball",
+            "765 universe",
+            "766 jumping",
+            "767 Jugular Foramem",
+            "768 melting often done in scientic test",
+            "769 Nuchal ligament",
+            "770 gas diffrent gases for test",
+            "771 god partical anither name for higgs boson",
+            "772 geek",
+            "773 gears",
+            "774 gap theory creationist scientice",
+            "775 geo-phyics",
+            "776 geometry",
+            "777 gogels used for science experiments",
+            "778 Gailic football",
+            "779 Goblet cell A unicellular mucus-secreting gland",
+            "780 history",
+            "781 Life",
+            "782 Hocky",
+            "783 horse riding",
+            "784 Literture",
+            "785 liver the human liver",
+            "786 Handball",
+            "787 log book",
+            "788 Laiser shooting",
+            "789 hub to do with IT",
+            "790 chess",
+            "791 body building",
+            "792 boxing",
+            "793 Charles Darwin",
+            "794 Botamy",
+            "795 Bifurcate ligament",
+            "796 BMX",
+            "797 big bang theory",
+            "798 blast like a laser blast",
+            "799 bob the builder",
+            "801 Side jobs",
+            "802 dictator",
+            "803 Suri voice to speach teck company",
+            "804 speach",
+            "805 services",
+            "806 Sony",
+            "807 sega video games",
+            "808 solicitores",
+            "809 subway resterant sandwich company",
+            "810 Disney",
+            "811 Dyson Singaporean–British multinational technology company",
+            "812 Duke energy",
+            "813 Dear used for formal writing",
+            "814 Deutsch bank",
+            "815 DoveVivo",
+            "816 dunes",
+            "817 Dog retale group",
+            "818 deltic timber corperations",
+            "819 DIB bank islamic bank",
+            "820 cost",
+            "821 code.org",
+            "822 xane ai",
+            "823 Court",
+            "824 capitec bank SA bank",
+            "825 KFC",
+            "826 companies",
+            "827 Keybank",
+            "828 Keelings",
+            "829 Cabify (ride-sharing platform)",
+            "830 Rust Programing language",
+            "831 rights",
+            "832 Rex porn productions",
+            "833 war",
+            "834 Republicans",
+            "835 raphael Saint Raphael",
+            "836 registratuon",
+            "837 Wigs the wigs political party",
+            "838 walmart",
+            "839 richness businesses are about increasing wealth",
+            "840 taxes",
+            "841 Ted talks",
+            "842 tuck shop",
+            "843 parlament",
+            "844 Peter hello pettet to review business",
+            "845 tactics",
+            "846 Tony Spagetri",
+            "847 toyota",
+            "848 aple computer company",
+            "849 teachers essential for business",
+            "850 office",
+            "851 voda phone",
+            "852 FactSet Research Systems (financial data provider)",
+            "853 formol",
+            "854 vote",
+            "855 Fake like fake watches",
+            "856 foundation you need to get your foundations",
+            "857 Fuge Technologies (IT services)",
+            "858 Falco International Logistics",
+            "859 FibroBiologics (biotech research)",
+            "860 inocent",
+            "861 mad mutually ashored destruction",
+            "862 Macdonalds",
+            "863 Nuru nuru massage business",
+            "864 employee",
+            "865 moving change is needed for business",
+            "866 judge",
+            "867 negotiate",
+            "868 nill when you habe nothing in business",
+            "869 mob mobs make money",
+            "870 Yes Banking Tech",
+            "871 goods",
+            "872 Macobs Technologies (IT services)",
+            "873 green movement enviromentalism",
+            "874 GP morgan",
+            "875 government",
+            "876 Gensen impact",
+            "877 Google",
+            "878 guilty",
+            "879 Gucci",
+            "880 listing the listing of companies",
+            "881 Aldi",
+            "882 election",
+            "883 Lawyers",
+            "884 leap frog",
+            "885 leaf service adding gold leaf to objevts",
+            "886 Linked",
+            "887 legal",
+            "888 lay offs",
+            "889 labour",
+            "890 Business",
+            "891 bio-degradible to use for businesses]",
+            "892 cheaky Nandos",
+            "893 brand",
+            "894 Peters Pub",
+            "895 chivas regal am alcoholic drink",
+            "896 BMW",
+            "897 beggers when people fail to be rich",
+            "898 ballet",
+            "899 chobani us yoget company",
+            "901 Seduction of the Innocent movies (1995)",
+            "902 saxons the saxons",
+            "903 Sarmatians Nomadic Iranian confederation",
+            "904 star wars",
+            "905 Shivwits Paiute band in southwestern Utah",
+            "906 Senoi Indigenous hunter-gatherers of Peninsular Malaysia",
+            "907 Sogdians Iranian trading people along the Silk Road",
+            "908 Seleucids Hellenistic Greek dynasty",
+            "909 Sabines Italic tribe in central Italy",
+            "910 Disaster Movie (2008)",
+            "911 deadpool",
+            "912 Doctor Strange",
+            "913 Dragon ball Z",
+            "914 duty, (call of Duty)",
+            "915 Devil Wears Parada",
+            "916 Darius (Persi9n King)",
+            "917 Dog Days (2018)",
+            "918 Dolphin Tale (2011)",
+            "919 Dubliners (1987, Documentary)",
+            "920 castle",
+            "921 Caddo Native American confederacy",
+            "922 Kikuyu Bantu people of Kenya",
+            "923 Karl Marx",
+            "924 Captan America",
+            "925 coffee date (2006)",
+            "926 kamikaze pilots ww2 Japanese suicide bombers",
+            "927 Cagliostro (Alessandro Cagliostro)",
+            "928 colonialism",
+            "929 cabo blanco (1980)",
+            "930 Wizard of Ozz",
+            "931 red riding hood",
+            "932 Wakanda",
+            "933 rowan Atkinson Mr bean",
+            "934 ripper jack the ripper",
+            "935 river of no return (1954)",
+            "936 Winsons Churchill",
+            "937 wig the Wigs political party",
+            "938 William Shakespeare",
+            "939 Robin Hood",
+            "940 Toy Story",
+            "941 Padua Uprising (Italy, 1848)",
+            "942 Pucarani Revolt (Bolivia, independence wars)",
+            "943 Tartessians Pre-Celtic people in southern Iberia",
+            "944 Peter Parker Spiderman",
+            "945 Tuvans Turkic people of Siberia",
+            "946 punic wars the punic wars",
+            "947 Taginae Battle of Taginae",
+            "948 plaque the plaque",
+            "949 Tibeto-Burman Linguistic group in the Himalayas",
+            "950 Fascism",
+            "951 vad the Impaler",
+            "952 fax machines",
+            "953 Forest Gamp",
+            "954 Avatar",
+            "955 feaver the spanish flue",
+            "956 avengers the avengets",
+            "957 Vagas battle Portugues battle",
+            "958 Vladimir Lenin",
+            "959 fable like the game",
+            "960 ancient",
+            "961 medival",
+            "962 Joker (batman)",
+            "963 Jurassic Park",
+            "964 Napoleon",
+            "965 Jaffa battle of Jaffa",
+            "966 Immanual Kant",
+            "967 magnesia the battle of magnesoa 190 bce rome",
+            "968 Julius Ceaser",
+            "969 machias battle of ... first naval battle",
+            "970 Ghost busters",
+            "971 godfather the godfather",
+            "972 Gokturks Turkic nomadic confederation",
+            "973 green latern",
+            "974 Gepids East Germanic tribe",
+            "975 Gephyraei Ancient Greek clan",
+            "976 Gonds Dravidian tribal people",
+            "977 Goguryeo Korean kingdom",
+            "978 gladiator fights",
+            "979 Gebel Barkal Cushitic people of Nubia",
+            "980 hiest money hiest",
+            "981 Lion King The lion king",
+            "982 Alexander the Great",
+            "983 Lord of the rings",
+            "984 Hitler",
+            "985 Elvis Presly",
+            "986 Hanible man of the alps",
+            "987 Huguenots French Protestant communities",
+            "988 Hell boy",
+            "989 Habiru Semi-nomadic people",
+            "990 BC",
+            "991 bad boys",
+            "992 back to the future",
+            "993 Braveheart",
+            "994 Bat Man",
+            "995 Bouvines battle (1214)",
+            "996 Chinook Native American people",
+            "997 bagrat the first",
+            "998 Black Panther",
+            "999 Chachapoya Andean people"
+        ];
+
+        // Build a full array of 999 entries, padded with "not applicable"
+        const TOTAL_ENTRIES = 999;
+        const words = new Array(TOTAL_ENTRIES).fill(null).map((_, idx) => {
+            const num = idx + 1;
+            const paddedNum = String(num).padStart(3, '0');
+            return `${paddedNum} not applicable`;
+        });
+
+        // Overwrite with real entries where available
+        originalEntries.forEach(entry => {
+            // extract the leading number (e.g., "101" from "101 psi")
+            const match = entry.match(/^(\d+)/);
+            if (match) {
+                const number = parseInt(match[1], 10);
+                if (number >= 1 && number <= TOTAL_ENTRIES) {
+                    words[number - 1] = entry;
+                }
+            }
+        });
+
+        // Rest of the script remains unchanged
+        const digitColors = [
+            { bg: '#111111', text: '#FFFFFF' }, { bg: '#8B4513', text: '#FFFFFF' },
+            { bg: '#FF4136', text: '#FFFFFF' }, { bg: '#FF851B', text: '#000000' },
+            { bg: '#FFDC00', text: '#000000' }, { bg: '#2ECC40', text: '#000000' },
+            { bg: '#0074D9', text: '#FFFFFF' }, { bg: '#B10DC9', text: '#FFFFFF' },
+            { bg: '#AAAAAA', text: '#000000' }, { bg: '#FFFFFF', text: '#000000' }
+        ];
+
+        const modes = [
+            { step: 1,   bg: '#121824', border: '#2b394e', screen: '#070a0f', name: 'Mode 1: Advance by 1' },     
+            { step: 10,  bg: '#1c1c1e', border: '#e5e5ea', screen: '#0b0b0c', name: 'Mode 2: Advance by 10' },    
+            { step: 100, bg: '#231515', border: '#4a2525', screen: '#120808', name: 'Mode 3: Advance by 100' }    
+        ];
+
+        // State Variables
+        let listIndex = 0;
+        let charIndex = 0;
+        let modeIndex = 0;
+
+        function setCircle(id, digit, showText = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (digit >= 0 && digit <= 9) {
+                el.innerText = showText ? digit : ''; 
+                el.style.backgroundColor = digitColors[digit].bg;
+                el.style.color = digitColors[digit].text;
+            } else {
+                el.innerText = showText ? '-' : '';
+                el.style.backgroundColor = '#333';
+                el.style.color = '#fff';
+            }
+        }
+
+        function updateDisplay() {
+            const currentText = words[listIndex];
+            const len = currentText.length;
+
+            // Enforce purely circular navigation within the current word
+            charIndex = ((charIndex % len) + len) % len;
+
+            const currChar = currentText[charIndex];
+            const prevChar = currentText[(charIndex - 1 + len) % len];
+            const nextChar = currentText[(charIndex + 1) % len];
+
+            const currUni = currChar.codePointAt(0).toString().padStart(3, '0');
+            const prevUni = prevChar.codePointAt(0).toString().padStart(3, '0');
+            const nextUni = nextChar.codePointAt(0).toString().padStart(3, '0');
+
+            // Current (Top Right)
+            setCircle('circ-tr1', parseInt(currUni[0]));
+            setCircle('circ-tr2', parseInt(currUni[1]));
+            setCircle('circ-tr3', parseInt(currUni[2]));
+
+            // Prev (Top Left)
+            setCircle('circ-tl1', parseInt(prevUni[0]));
+            setCircle('circ-tl2', parseInt(prevUni[1]));
+            setCircle('circ-tl3', parseInt(prevUni[2]));
+
+            // Next (Bottom Right)
+            setCircle('circ-br1', parseInt(nextUni[0]));
+            setCircle('circ-br2', parseInt(nextUni[1]));
+            setCircle('circ-br3', parseInt(nextUni[2]));
+
+            // List Index Position (Bottom Left - Top Row) -> 1-based index of current word (NOW 3 DIGITS)
+            let listNumStr = (listIndex + 1).toString().padStart(3, '0');
+            if (listNumStr.length > 3) listNumStr = listNumStr.slice(-3);
+            setCircle('circ-bl-list0', parseInt(listNumStr[0]));
+            setCircle('circ-bl-list1', parseInt(listNumStr[1]));
+            setCircle('circ-bl-list2', parseInt(listNumStr[2]));
+
+            // Character Index Position (Bottom Left - Bottom Row) -> 1-based index of current character (NOW 3 DIGITS)
+            let charNumStr = (charIndex + 1).toString().padStart(3, '0');
+            if (charNumStr.length > 3) charNumStr = charNumStr.slice(-3);
+            setCircle('circ-bl0', parseInt(charNumStr[0]));
+            setCircle('circ-bl1', parseInt(charNumStr[1]));
+            setCircle('circ-bl2', parseInt(charNumStr[2]));
+        }
+
+        function changeList(direction) {
+            // Apply the mode's step size (1, 10, or 100) to the list jumps
+            const step = modes[modeIndex].step;
+            const delta = direction * step;
+            
+            listIndex = ((listIndex + delta % words.length) + words.length) % words.length;
+            charIndex = 0; // Reset character position when changing list words
+            updateDisplay();
+        }
+
+        function jumpSequence(direction) {
+            // Always advance the character index by exactly 1, ignoring the mode step
+            charIndex += direction;
+            updateDisplay();
+        }
+
+        function toggleMode() {
+            modeIndex = (modeIndex + 1) % modes.length;
+            const currentMode = modes[modeIndex];
+            
+            document.getElementById('watchScreen').style.backgroundColor = currentMode.screen;
+            document.getElementById('watchCase').style.background = currentMode.bg;
+            document.getElementById('watchCase').style.borderColor = currentMode.border;
+            document.getElementById('modeIndicator').innerText = currentMode.name;
+
+            // Trigger the peek text overlay automatically
+            triggerPeekText();
+        }
+
+        // Context Peek Logic
+        let peekTimeoutId = null;
+        function triggerPeekText(e) {
+            if (e) e.stopPropagation(); 
+            const currentText = words[listIndex];
+            const charArray = Array.from(currentText);
+            
+            let prevChars = "";
+            let startIndex = Math.max(0, charIndex - 8);
+            for (let i = startIndex; i < charIndex; i++) {
+                prevChars += charArray[i] === ' ' ? '&nbsp;' : charArray[i];
+            }
+
+            let currChar = charArray[charIndex] === ' ' ? '&nbsp;' : charArray[charIndex];
+
+            let nextChars = "";
+            let endIndex = Math.min(charArray.length - 1, charIndex + 8);
+            for (let i = charIndex + 1; i <= endIndex; i++) {
+                nextChars += charArray[i] === ' ' ? '&nbsp;' : charArray[i];
+            }
+
+            let displayHTML = `
+                <div class="peek-context-row">${prevChars || '&nbsp;'}</div>
+                <div class="peek-current-row">${currChar}</div>
+                <div class="peek-context-row">${nextChars || '&nbsp;'}</div>
+            `;
+
+            const overlay = document.getElementById('textOverlay');
+            overlay.innerHTML = displayHTML;
+            overlay.style.display = 'flex';
+
+            if (peekTimeoutId) clearTimeout(peekTimeoutId);
+            
+            peekTimeoutId = setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
+        }
+
+        function toggleFullScreen() {
+            const el = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (el.requestFullscreen) {
+                    el.requestFullscreen().catch(err => console.log(err));
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+
+        // Attach fullscreen directly to center-dot with both click and touch
+        document.addEventListener('DOMContentLoaded', () => {
+            const dot = document.querySelector('.center-dot');
+            if (dot) {
+                dot.addEventListener('click', (e) => { e.stopPropagation(); toggleFullScreen(); });
+                dot.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); toggleFullScreen(); });
+            }
+        });
+
+        // --- Event Listeners ---
+
+        const watchScreen = document.getElementById('watchScreen');
+        
+        // Left Click / Single Tap to advance forward
+        watchScreen.addEventListener('click', (e) => {
+            if (e.target.classList.contains('center-dot') || e.target.closest('#modePeekBtn')) return; 
+            jumpSequence(1); 
+        });
+
+        // Right Click to move backwards
+        watchScreen.addEventListener('contextmenu', (e) => {
+            if (e.target.classList.contains('center-dot') || e.target.closest('#modePeekBtn')) return; 
+            e.preventDefault(); // Prevents the browser menu from showing up
+            jumpSequence(-1); 
+        });
+
+        // Mouse Wheel changes the list item
+        let lastScrollTime = 0;
+        watchScreen.addEventListener('wheel', (e) => {
+            const currentTime = new Date().getTime();
+            if (currentTime - lastScrollTime < 150) return; 
+
+            if (e.deltaY < 0) {
+                changeList(-1); // Up
+            } else if (e.deltaY > 0) {
+                changeList(1); // Down
+            }
+            lastScrollTime = currentTime;
+        }, { passive: true });
+
+        // Touch interactions
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        watchScreen.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        watchScreen.addEventListener('touchend', (e) => {
+            if (e.target.closest('#modePeekBtn') || e.target.classList.contains('center-dot')) return; 
+
+            let touchEndX = e.changedTouches[0].clientX;
+            let touchEndY = e.changedTouches[0].clientY;
+            
+            let deltaX = touchEndX - touchStartX;
+            let deltaY = touchEndY - touchStartY;
+            
+            // Swipe X-axis: Change Step Size Mode
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+                toggleMode(); 
+            } 
+            // Swipe Y-axis: Switch List items
+            else if (Math.abs(deltaY) > 30) {
+                if (deltaY < -30) {
+                    changeList(1); 
+                } else if (deltaY > 30) {
+                    changeList(-1); 
+                }
+            }
+        }, { passive: true });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                toggleMode();
+            }
+            if (e.key === 'ArrowUp') {
+                changeList(-1);
+            }
+            if (e.key === 'ArrowDown') {
+                changeList(1);
+            }
+        });
+
+        // Random number display — fades to a new 3-digit number every 1.5 minutes
+        function randomThreeDigit() {
+            return String(Math.floor(Math.random() * 900) + 100); // 100–999
+        }
+
+        function cycleRandomNumber() {
+            const el = document.getElementById('randomNumber');
+            el.style.opacity = '0';
+            setTimeout(() => {
+                el.textContent = randomThreeDigit();
+                el.style.opacity = '1';
+            }, 1000); // wait for fade-out, then show new number
+        }
+
+        // Init
+        window.onload = () => {
+            updateDisplay();
+            // Set initial random number and start cycle
+            const el = document.getElementById('randomNumber');
+            el.textContent = randomThreeDigit();
+            setInterval(cycleRandomNumber, 90000); // every 1.5 minutes
+        };
+
+    </script>
+</body>
+</html>
